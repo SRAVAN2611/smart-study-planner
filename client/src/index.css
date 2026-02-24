@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ================= DARK MODE CALENDAR FIX ================= */
+
+.dark .react-calendar {
+  background: #1f2937;      /* dark card */
+  color: white;
+  border-radius: 12px;
+  border: none;
+  padding: 10px;
+}
+
+/* Day tiles */
+.dark .react-calendar__tile {
+  color: white;
+  border-radius: 8px;
+}
+
+/* Hover effect */
+.dark .react-calendar__tile:hover {
+  background: #374151;
+}
+
+/* Selected date */
+.dark .react-calendar__tile--active {
+  background: #4f46e5 !important;
+  color: white !important;
+}
+
+/* Today highlight */
+.dark .react-calendar__tile--now {
+  background: #059669;
+  color: white;
+}
+
+/* Navigation buttons (month arrows) */
+.dark .react-calendar__navigation button {
+  color: white;
+  background: transparent;
+}
+
+/* Weekday names */
+.dark .react-calendar__month-view__weekdays {
+  color: #cbd5e1;
+}
+
+/* Disabled dates */
+.dark .react-calendar__tile:disabled {
+  color: #6b7280;
+}
