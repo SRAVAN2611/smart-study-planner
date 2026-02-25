@@ -1,295 +1,302 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
-
 import { Bar } from "react-chartjs-2";
+import "chart.js/auto";
 import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Tooltip,
-  Legend
-} from "chart.js";
+  FaUser,
+  FaChartBar,
+  FaCalendar,
+  FaSun,
+  FaMoon,
+  FaSignOutAlt,
+} from "react-icons/fa";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
+export default function Dashboard() {
+  const storedUser = JSON.parse(localStorage.getItem("user"));
 
-function Dashboard() {
-
-  const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem("user"));
-
-  const [dark, setDark] = useState(false);
-  const [date, setDate] = useState(new Date());
-  const [task, setTask] = useState("");
+  const [user, setUser] = useState(storedUser);
   const [tasks, setTasks] = useState([]);
-  const [pendingTasks, setPendingTasks] = useState([]);
-  const [goal, setGoal] = useState("");
-  const [saved, setSaved] = useState(false);
+  const [goal, setGoal] = useState(storedUser?.goal || "");
+  const [newTask, setNewTask] = useState("");
+  const [date, setDate] = useState(new Date());
+  const [dark, setDark] = useState(true);
 
-  const selectedDate = date.toISOString().split("T")[0];
-
-  // Load tasks for selected date
+  // ================= LOAD TASKS =================
   useEffect(() => {
-    if (!user) return;
-
-    fetch(`http://localhost:5000/tasks/${user._id}/${selectedDate}`)
+    fetch(`http://localhost:5000/tasks/${user._id}`)
       .then(res => res.json())
       .then(data => setTasks(data));
-  }, [date]);
+  }, []);
 
-  // Load all pending tasks
-  useEffect(() => {
-    if (!user) return;
-
-    fetch(`http://localhost:5000/pending/${user._id}`)
-      .then(res => res.json())
-      .then(data => setPendingTasks(data));
-  }, [tasks]);
-
-  const logout = () => {
-    localStorage.removeItem("user");
-    navigate("/");
-  };
-
+  // ================= ADD TASK =================
   const addTask = async () => {
-    if (!task) return;
+    if (!newTask.trim()) return;
 
     const res = await fetch("http://localhost:5000/tasks", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        text: newTask,
+        date: date.toISOString().split("T")[0],
         userId: user._id,
-        text: task,
-        date: selectedDate
-      })
+      }),
     });
 
-    const newTask = await res.json();
-    setTasks([...tasks, newTask]);
-    setTask("");
+    const data = await res.json();
+    setTasks([...tasks, data]);
+    setNewTask("");
   };
 
-  const toggleTask = async (id) => {
-    const res = await fetch(`http://localhost:5000/tasks/${id}`, {
-      method: "PUT"
-    });
-
+  // ================= TOGGLE TASK =================
+  const toggleTask = async id => {
+    const res = await fetch(
+      `http://localhost:5000/tasks/${id}`,
+      { method: "PUT" }
+    );
     const updated = await res.json();
-    setTasks(tasks.map(t => t._id === id ? updated : t));
+
+    setTasks(tasks.map(t => (t._id === id ? updated : t)));
   };
 
-  const deleteTask = async (id) => {
-    await fetch(`http://localhost:5000/tasks/${id}`, {
-      method: "DELETE"
-    });
+  // ================= SAVE GOAL =================
+  const saveGoal = async () => {
+    const res = await fetch(
+      `http://localhost:5000/user/${user._id}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ goal }),
+      }
+    );
 
-    setTasks(tasks.filter(t => t._id !== id));
+    const updatedUser = await res.json();
+
+    // UPDATE UI + LOCAL STORAGE
+    setUser(updatedUser);
+    localStorage.setItem("user", JSON.stringify(updatedUser));
+
+    alert("Goal updated successfully 🎯");
   };
 
+  // ================= LOGOUT =================
+  const logout = () => {
+    localStorage.removeItem("user");
+    window.location.href = "/";
+  };
+
+  // ================= FILTER TASKS =================
+  const selectedDate = date.toISOString().split("T")[0];
+  const tasksForDate = tasks.filter(t => t.date === selectedDate);
+
+  // ================= REPORT =================
   const total = tasks.length;
   const completed = tasks.filter(t => t.completed).length;
   const pending = total - completed;
-  const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
 
+  const percent =
+    total === 0 ? 0 : Math.round((completed / total) * 100);
+
+  // Efficiency Rating
+  let efficiency = "Poor";
+  if (percent >= 80) efficiency = "Excellent 🔥";
+  else if (percent >= 50) efficiency = "Good 👍";
+  else if (percent >= 30) efficiency = "Average 🙂";
+
+  // ALL PENDING TASKS SORTED BY DATE
+  const allPendingTasks = tasks
+    .filter(t => !t.completed)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  // CHART DATA
   const chartData = {
     labels: ["Completed", "Pending"],
     datasets: [
       {
-        label: "Tasks",
         data: [completed, pending],
-        backgroundColor: ["#4ade80", "#f87171"]
-      }
-    ]
+        backgroundColor: ["#22c55e", "#ef4444"],
+      },
+    ],
   };
 
   return (
-    <div className={dark ? "dark" : ""}>
-      <div className="min-h-screen flex bg-gray-100 dark:bg-gray-900 text-black dark:text-white">
+    <div
+      className={
+        dark
+          ? "dark bg-slate-900 text-white min-h-screen"
+          : "bg-gray-100 min-h-screen"
+      }
+    >
+      <div className="flex">
 
         {/* SIDEBAR */}
-        <aside className="w-64 bg-indigo-700 p-6 text-white">
+        <aside className="w-60 bg-indigo-700 text-white p-5 space-y-4 min-h-screen">
+          <h1 className="text-xl font-bold">📘 Planner</h1>
 
-          <h1 className="text-2xl font-bold mb-8">📘 Planner</h1>
+          <p className="flex items-center gap-2">
+            <FaUser /> Profile
+          </p>
+          <p className="flex items-center gap-2">
+            <FaCalendar /> Planner
+          </p>
+          <p className="flex items-center gap-2">
+            <FaChartBar /> Analytics
+          </p>
 
           <button
             onClick={() => setDark(!dark)}
-            className="bg-black/30 px-3 py-1 rounded mb-6"
+            className="bg-black/30 px-3 py-2 rounded flex items-center gap-2"
           >
-            {dark ? "☀️ Light" : "🌙 Dark"}
+            {dark ? <FaSun /> : <FaMoon />} Theme
           </button>
 
-          <nav className="space-y-3">
-            <p>👤 Profile</p>
-            <p>📅 Tasks</p>
-            <p>📊 Analytics</p>
-            <p>🗓️ Calendar</p>
-          </nav>
-
+          <button
+            onClick={logout}
+            className="bg-red-500 px-3 py-2 rounded flex items-center gap-2 mt-4"
+          >
+            <FaSignOutAlt /> Logout
+          </button>
         </aside>
 
         {/* MAIN */}
-        <main className="flex-1 p-8">
+        <main className="flex-1 p-6 space-y-6">
 
-          {/* HEADER */}
-          <div className="flex justify-between mb-8">
-            <h1 className="text-3xl font-bold">
-              Welcome {user?.name}
-            </h1>
+          {/* PROFILE */}
+          <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow text-black dark:text-white">
+            <h2 className="font-bold mb-2">👤 Profile</h2>
+
+            <p>Name: {user.name}</p>
+            <p>Email: {user.email}</p>
+
+            <input
+              value={goal}
+              onChange={e => setGoal(e.target.value)}
+              placeholder="Set study goal"
+              className="border px-3 py-2 mt-2 rounded w-full text-black"
+            />
 
             <button
-              onClick={logout}
-              className="bg-red-500 px-4 py-2 rounded text-white"
+              onClick={saveGoal}
+              className="mt-2 bg-indigo-600 text-white px-4 py-2 rounded"
             >
-              Logout
+              Save Goal
             </button>
+
+            <p className="mt-2">
+              🎯 Current Goal:{" "}
+              <span className="font-semibold">
+                {user.goal || "Not set"}
+              </span>
+            </p>
           </div>
 
-          {/* PROFILE + REPORT */}
-          <div className="grid md:grid-cols-2 gap-6">
+          {/* REPORT */}
+          <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow text-black dark:text-white">
+            <h2 className="font-bold mb-2">📊 Report</h2>
 
-            {/* PROFILE */}
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow">
-              <h2 className="font-bold mb-3">👤 Profile</h2>
+            <p>Total Tasks: {total}</p>
+            <p>Completed: {completed}</p>
+            <p>Pending: {pending}</p>
 
-              {!saved ? (
-                <>
-                  <input
-                    placeholder="Study Goal"
-                    value={goal}
-                    onChange={(e) => setGoal(e.target.value)}
-                    className="w-full p-2 border rounded mb-2 text-black"
-                  />
+            <p className="font-bold">
+              Completion: {percent}%
+            </p>
 
-                  <button
-                    onClick={() => setSaved(true)}
-                    className="bg-green-500 text-white px-4 py-1 rounded"
-                  >
-                    Save
-                  </button>
-                </>
-              ) : (
-                <p>Goal: {goal}</p>
-              )}
-            </div>
-
-            {/* REPORT */}
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow">
-              <h2 className="font-bold mb-3">📊 Report</h2>
-
-              <p>Total: {total}</p>
-              <p>Completed: {completed}</p>
-              <p>Pending: {pending}</p>
-              <p>Completion: {percent}%</p>
-
-              <div className="w-full bg-gray-300 h-4 mt-2 rounded">
-                <div
-                  className="bg-green-500 h-4 rounded"
-                  style={{ width: percent + "%" }}
-                ></div>
-              </div>
-            </div>
-
+            <p className="mt-2 text-lg">
+              Efficiency:{" "}
+              <span className="font-bold">
+                {efficiency}
+              </span>
+            </p>
           </div>
 
-          {/* CALENDAR */}
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow mt-6 max-w-xl">
-            <h2 className="font-bold mb-4">🗓️ Select Study Date</h2>
+          {/* CALENDAR + TASKS */}
+          <div className="grid md:grid-cols-2 gap-4">
 
-            <Calendar onChange={setDate} value={date} />
-
-            <p className="mt-3">Selected: {selectedDate}</p>
-          </div>
-
-          {/* TASKS */}
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow mt-6 max-w-3xl">
-            <h2 className="font-bold mb-4">
-              📅 Tasks for {selectedDate}
-            </h2>
-
-            <div className="flex gap-2 mb-4">
-              <input
-                value={task}
-                onChange={(e) => setTask(e.target.value)}
-                placeholder="New task"
-                className="flex-1 p-2 border rounded text-black"
-              />
-
-              <button
-                onClick={addTask}
-                className="bg-indigo-600 text-white px-4 rounded"
-              >
-                Add
-              </button>
+            <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow">
+              <Calendar onChange={setDate} value={date} />
             </div>
 
-            <ul className="space-y-2">
-              {tasks.map(t => (
-                <li
-                  key={t._id}
-                  className="flex justify-between p-2 bg-gray-100 dark:bg-gray-700 rounded"
+            <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow text-black dark:text-white">
+
+              <div className="flex gap-2 mb-3">
+                <input
+                  value={newTask}
+                  onChange={e => setNewTask(e.target.value)}
+                  placeholder="New task"
+                  className="flex-1 border px-3 py-2 rounded text-black"
+                />
+
+                <button
+                  onClick={addTask}
+                  className="bg-indigo-600 text-white px-4 rounded"
                 >
-                  <div>
+                  Add
+                </button>
+              </div>
+
+              {tasksForDate.map(task => (
+                <div
+                  key={task._id}
+                  className="flex justify-between bg-gray-200 dark:bg-gray-700 p-2 rounded mb-2"
+                >
+                  <div className="flex gap-2">
                     <input
                       type="checkbox"
-                      checked={t.completed}
-                      onChange={() => toggleTask(t._id)}
+                      checked={task.completed}
+                      onChange={() => toggleTask(task._id)}
                     />
-                    <span className="ml-2">{t.text}</span>
+
+                    <span
+                      className={task.completed ? "line-through" : ""}
+                    >
+                      {task.text}
+                    </span>
                   </div>
-
-                  <button
-                    onClick={() => deleteTask(t._id)}
-                    className="text-red-500"
-                  >
-                    🗑️
-                  </button>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
 
-          {/* ANALYTICS */}
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow mt-6 max-w-xl">
-            <h2 className="font-bold mb-4">📊 Analytics</h2>
-            <Bar data={chartData} />
-          </div>
-
-          {/* ⭐ ALL PENDING TASKS */}
-          <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow mt-6 max-w-3xl">
-
-            <h2 className="font-bold mb-4">
+          {/* ALL PENDING TASKS */}
+          <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow text-black dark:text-white">
+            <h2 className="font-bold mb-3">
               ⏳ All Pending Tasks
             </h2>
 
-            {pendingTasks.length === 0 ? (
+            {allPendingTasks.length === 0 ? (
               <p>No pending tasks 🎉</p>
             ) : (
-              <ul className="space-y-2">
-                {pendingTasks.map(t => (
-                  <li
-                    key={t._id}
-                    className="p-3 bg-gray-100 dark:bg-gray-700 rounded"
-                  >
-                    <p className="font-medium">{t.text}</p>
-                    <p className="text-sm opacity-70">
-                      📅 {t.date}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
+              allPendingTasks.map(task => (
+                <div
+                  key={task._id}
+                  className="flex justify-between bg-yellow-100 dark:bg-yellow-900 p-3 rounded mb-2"
+                >
+                  <span>
+                    📌 {task.text} — {task.date}
+                  </span>
 
+                  <button
+                    onClick={() => toggleTask(task._id)}
+                    className="bg-green-500 px-3 rounded text-white"
+                  >
+                    Done
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* ANALYTICS */}
+          <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow text-black dark:text-white">
+            <h2 className="font-bold mb-2">📊 Analytics</h2>
+            <Bar data={chartData} />
           </div>
 
         </main>
-
       </div>
     </div>
   );
 }
-
-export default Dashboard;
